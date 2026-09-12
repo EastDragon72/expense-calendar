@@ -438,7 +438,8 @@ function setStatus(msg, isError){
   const el = document.getElementById('statusMsg');
   el.textContent = msg;
   el.className = isError ? 'error' : '';
-  if(msg) setTimeout(()=>{ el.textContent=''; }, 3000);
+  // 에러 메시지는 캡처할 시간을 주기 위해 자동으로 지우지 않음
+  if(msg && !isError) setTimeout(()=>{ el.textContent=''; }, 3000);
 }
 
 // 입력창 아래에 필터링된 후보를 보여주는 커스텀 자동완성 드롭다운
@@ -676,7 +677,13 @@ async function onSubmit(e){
     await renderCalendar();
     await refreshList(selectedDate);
   }catch(err){
-    setStatus('저장에 실패했습니다: ' + (err.message || err), true);
+    const detail = [
+      err.message ? `message: ${err.message}` : '',
+      err.code ? `code: ${err.code}` : '',
+      err.details ? `details: ${err.details}` : '',
+      err.hint ? `hint: ${err.hint}` : ''
+    ].filter(Boolean).join(' / ');
+    setStatus('저장 실패: ' + (detail || JSON.stringify(err)), true);
   }finally{
     saveBtn.disabled = false;
     saveBtn.textContent = editingId ? '수정하기' : '저장하기';
@@ -742,7 +749,13 @@ async function refreshList(dateStr){
           await renderCalendar();
           await refreshList(dateStr);
         }catch(err){
-          setStatus('삭제에 실패했습니다: ' + (err.message || err), true);
+          const detail = [
+            err.message ? `message: ${err.message}` : '',
+            err.code ? `code: ${err.code}` : '',
+            err.details ? `details: ${err.details}` : '',
+            err.hint ? `hint: ${err.hint}` : ''
+          ].filter(Boolean).join(' / ');
+          setStatus('삭제 실패: ' + (detail || JSON.stringify(err)), true);
         }
       });
     });

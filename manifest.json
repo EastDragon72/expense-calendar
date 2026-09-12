@@ -1,0 +1,26 @@
+{
+  "name": "지출 캘린더",
+  "short_name": "지출캘린더",
+  "description": "날짜별 지출을 기록하고 관리하는 캘린더 앱",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#FAF7F0",
+  "theme_color": "#2F5233",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

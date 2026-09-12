@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#2F5233" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="지출캘린더" />
+<title>지출 캘린더</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png" />
+<link rel="icon" href="icon-192.png" sizes="192x192" type="image/png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --paper:#FAF7F0;
+    --ink:#2B2A28;
+    --ink-soft:#6B6659;
+    --line:#D8D2C4;
+    --green:#2F5233;
+    --green-soft:#E4EAE0;
+    --brown:#8B6F47;
+    --red:#A63D40;
+    --serif: 'Noto Serif KR', serif;
+    --sans: 'Noto Sans KR', sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sans);
+    -webkit-tap-highlight-color: transparent;
+  }
+  body{
+    padding: 20px 16px calc(60px + env(safe-area-inset-bottom));
+    max-width: 560px;
+    margin: 0 auto;
+  }
+  header{
+    display:flex; justify-content:space-between; align-items:center;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 14px;
+    margin-bottom: 20px;
+  }
+  header .title{
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: 24px;
+    letter-spacing: -0.01em;
+  }
+  .add-btn{
+    padding: 10px 18px;
+    min-height: 44px;
+    border-radius: 8px;
+    border: none;
+    background: var(--green);
+    color:#fff;
+    font-size:15px;
+    font-family: var(--sans);
+    font-weight:700;
+    cursor:pointer;
+  }
+
+  .month-nav{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom: 12px;
+  }
+  .nav-btn{
+    background:none; border:none; font-size:24px; color:var(--ink);
+    padding: 4px 12px; cursor:pointer; line-height:1;
+    min-width: 44px; min-height: 44px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .month-info{ text-align:center; }
+  .month-label{
+    display:block; font-family:var(--serif); font-size:18px; font-weight:700;
+  }
+  .month-total{
+    display:block; font-size:13px; color:var(--red); margin-top:2px; font-weight:700;
+  }
+
+  .calendar-weekdays{
+    display:grid; grid-template-columns:repeat(7,1fr);
+    text-align:center; font-size:12px; color:var(--ink-soft);
+    margin-bottom:4px;
+  }
+  .calendar-grid{
+    display:grid; grid-template-columns:repeat(7,1fr);
+    gap:3px;
+    margin-bottom: 6px;
+  }
+  .cal-cell{
+    aspect-ratio: 1 / 1;
+    min-height: 38px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    border-radius:6px;
+    font-size:13px;
+    cursor:pointer;
+    background:#fff;
+    border:1px solid var(--line);
+  }
+  .cal-cell.empty{ background:transparent; border-color:transparent; cursor:default; }
+  .cal-day{ font-size:14px; }
+  .cal-amt{ font-size:10px; color:var(--red); margin-top:2px; font-weight:700; }
+  .cal-cell.today{ border-color: var(--brown); border-width:2px; }
+  .cal-cell.selected{ background: var(--green); border-color:var(--green); }
+  .cal-cell.selected .cal-day{ color:#fff; }
+  .cal-cell.selected .cal-amt{ color:#fff; }
+
+  .field{
+    margin-bottom: 16px;
+  }
+  .field label{
+    display:block;
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+  input[type="date"], input[type="number"], input[type="text"], textarea, select{
+    width:100%;
+    font-family: var(--sans);
+    font-size: 16px;
+    padding: 12px 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink);
+  }
+  textarea{ min-height: 64px; resize: vertical; }
+  input:focus, select:focus, textarea:focus, button:focus{
+    outline: 2px solid var(--green);
+    outline-offset: 1px;
+  }
+
+  .autocomplete{ position:relative; }
+  .ac-list{
+    position:absolute; left:0; right:0; top:calc(100% + 4px);
+    background:#fff; border:1px solid var(--line); border-radius:8px;
+    box-shadow: 0 6px 16px rgba(43,42,40,0.12);
+    max-height:230px; overflow-y:auto; z-index:120;
+    display:none;
+  }
+  .ac-list.open{ display:block; }
+  .ac-item{
+    padding:13px 14px;
+    font-family: var(--sans);
+    font-size:16px;
+    color:var(--ink);
+    cursor:pointer;
+    border-bottom:1px solid var(--line);
+  }
+  .ac-item:last-child{ border-bottom:none; }
+  .ac-item:hover, .ac-item.highlight{ background: var(--green-soft); }
+
+  .amount-row{
+    display:flex; align-items:center; gap:8px;
+  }
+  .amount-row span{ font-size:15px; color:var(--ink-soft); }
+  .amount-field{ text-align:right; font-family: var(--serif); font-weight:700; font-size:18px; }
+
+  .save-btn{
+    width:100%;
+    padding: 15px;
+    font-size: 17px;
+    font-weight: 700;
+    font-family: var(--sans);
+    background: var(--green);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    margin-top: 6px;
+    cursor:pointer;
+  }
+  .save-btn:active{ opacity:0.85; }
+
+  #statusMsg{
+    text-align:center;
+    font-size: 14px;
+    color: var(--green);
+    height: 18px;
+    margin-top: 8px;
+  }
+  #statusMsg.error{ color: var(--red); }
+
+  .section-divider{
+    border:none;
+    border-top: 2px solid var(--ink);
+    margin: 24px 0 12px;
+  }
+  .list-header{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin-bottom: 8px;
+  }
+  .list-header .day-label{
+    font-family: var(--serif);
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .entry-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+    gap: 10px;
+  }
+  .entry-main{ flex:1; min-width:0; cursor:pointer; }
+  .entry-title{ font-size:16px; font-weight:500; }
+  .entry-meta{ font-size: 13px; color: var(--ink-soft); margin-top:2px; }
+  .entry-amount{
+    font-family: var(--serif);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--red);
+    white-space:nowrap;
+  }
+  .entry-del{
+    background:none; border:none; color: var(--ink-soft);
+    font-size: 13px; padding: 10px 8px; cursor:pointer;
+    min-height:44px; min-width:44px;
+  }
+  .empty-msg{
+    color: var(--ink-soft); font-size:14px; padding: 16px 0;
+    text-align:center;
+  }
+  .config-warning{
+    background: #FBEFE0; border: 1px solid var(--brown);
+    border-radius: 6px; padding: 12px 14px;
+    font-size: 13px; color: var(--ink); margin-bottom: 20px;
+    line-height:1.5;
+  }
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(43,42,40,0.45);
+    display:none; align-items:flex-end; justify-content:center;
+    z-index:100;
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal-box{
+    background:var(--paper); width:100%; max-width:560px;
+    border-radius:16px 16px 0 0;
+    padding:20px 16px 28px;
+    max-height:90vh; overflow-y:auto;
+  }
+  .modal-header{
+    display:flex; justify-content:space-between; align-items:center;
+    margin-bottom:14px;
+  }
+  .modal-title{ font-family:var(--serif); font-size:19px; font-weight:700; }
+  .modal-close{
+    background:none; border:none; font-size:20px; color:var(--ink-soft); cursor:pointer;
+    padding:4px 8px;
+    min-width:44px; min-height:44px;
+  }
+  .save-btn:disabled{ opacity:0.6; cursor:default; }
+
+  /* ===== 태블릿 이상 반응형 ===== */
+  @media (min-width: 700px){
+    body{ max-width: 720px; }
+    .calendar-grid{ gap:6px; }
+    .cal-cell{ font-size:14px; min-height:52px; }
+    .cal-day{ font-size:15px; }
+    .cal-amt{ font-size:11px; }
+    .modal-overlay{ align-items:center; }
+    .modal-box{
+      border-radius:16px;
+      max-width:480px;
+      max-height:85vh;
+    }
+  }
+  @media (min-width: 960px){
+    body{ max-width: 1040px; }
+    .content-grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      align-items:start;
+    }
+    .section-divider{ display:none; }
+    .list-section{
+      border-left: 2px solid var(--line);
+      padding-left: 40px;
+    }
+    .list-header{ margin-top: 4px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="configWarning" class="config-warning" style="display:none;">
+  ⚠ Supabase 접속 정보가 설정되지 않았습니다. 이 파일 상단의
+  <code>SUPABASE_URL</code>과 <code>SUPABASE_ANON_KEY</code> 값을
+  본인의 Supabase 프로젝트 값으로 채워 넣은 뒤 사용하세요.
+</div>
+
+<header>
+  <div class="title">지출 캘린더</div>
+  <button type="button" id="openModalBtn" class="add-btn">입력</button>
+</header>
+
+<div class="content-grid">
+<div class="calendar-section">
+
+<div class="month-nav">
+  <button type="button" id="prevMonthBtn" class="nav-btn" aria-label="이전 달">‹</button>
+  <div class="month-info">
+    <span class="month-label" id="monthLabel">-</span>
+    <span class="month-total" id="monthTotal">0원</span>
+  </div>
+  <button type="button" id="nextMonthBtn" class="nav-btn" aria-label="다음 달">›</button>
+</div>
+
+<div class="calendar-weekdays">
+  <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+</div>
+<div class="calendar-grid" id="calendarGrid"></div>
+
+</div>
+
+<hr class="section-divider" />
+
+<div class="list-section">
+<div class="list-header">
+  <span class="day-label" id="listDayLabel">기록</span>
+</div>
+<div id="entryList"></div>
+</div>
+
+</div>
+
+<div id="modalOverlay" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">지출 입력</span>
+      <button type="button" id="closeModalBtn" class="modal-close" aria-label="닫기">✕</button>
+    </div>
+    <form id="entryForm">
+      <div class="field">
+        <label for="recordDate">날짜</label>
+        <input type="date" id="recordDate" required />
+      </div>
+
+      <div class="field">
+        <label for="categoryInput">분류</label>
+        <div class="autocomplete">
+          <input type="text" id="categoryInput" autocomplete="off" placeholder="지출" />
+          <div class="ac-list" id="categoryDropdown"></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="titleInput">제목</label>
+        <div class="autocomplete">
+          <input type="text" id="titleInput" autocomplete="off" placeholder="장보기, 회식 등" />
+          <div class="ac-list" id="titleDropdown"></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="amountInput">금액</label>
+        <div class="amount-row">
+          <input type="text" id="amountInput" inputmode="numeric" placeholder="0" class="amount-field" required />
+          <span>원</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="memoInput">메모</label>
+        <textarea id="memoInput" placeholder="상세 내용 (선택)"></textarea>
+      </div>
+
+      <button type="submit" class="save-btn" id="saveBtn">저장하기</button>
+      <div id="statusMsg"></div>
+    </form>
+  </div>
+</div>
+
+<script>
+// ====== 여기에 본인의 Supabase 프로젝트 정보를 입력하세요 ======
+const SUPABASE_URL = "https://sxoxtdwipxdxkmmdfskb.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_9mDd0oL0hlTtfxN4gXOH-A_S2grqf8K";
+// ============================================================
+
+const DEFAULT_CATEGORY = "지출";
+const DEFAULT_TITLES = ["장보기", "회식", "기타"];
+let sb = null;
+let categoryOptionsData = [DEFAULT_CATEGORY];
+let titleOptionsData = [...DEFAULT_TITLES];
+let selectedDate = null;
+let viewYear = null;
+let viewMonth = null; // 1-12
+let editingId = null; // 수정 중인 기록의 id (null이면 신규 입력)
+
+function pad(n){ return String(n).padStart(2,'0'); }
+
+function todayStr(){
+  const d = new Date();
+  const off = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - off*60000);
+  return local.toISOString().slice(0,10);
+}
+
+// 숫자만 남기고 천 단위 콤마를 붙여 보여준다 (로케일 API 대신 정규식 사용 - 웹뷰 호환성)
+function formatComma(numStr){
+  return numStr.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+function fmtWon(n){
+  return formatComma(String(Math.round(Number(n||0)))) + '원';
+}
+function onAmountInput(e){
+  const raw = e.target.value.replace(/[^\d]/g, '');
+  e.target.value = raw ? formatComma(raw) : '';
+}
+function rawAmount(){
+  return document.getElementById('amountInput').value.replace(/[^\d]/g, '');
+}
+
+// content 필드 안에 "금액: N" 형식으로 저장하고, 그 아래 메모를 붙인다
+function buildContent(amount, memo){
+  let c = `금액: ${amount}`;
+  if(memo && memo.trim()) c += `\n${memo.trim()}`;
+  return c;
+}
+function parseAmount(content){
+  if(!content) return 0;
+  const m = content.match(/금액:\s*(-?\d+)/);
+  return m ? parseInt(m[1],10) : 0;
+}
+function parseMemo(content){
+  if(!content) return '';
+  const idx = content.indexOf('\n');
+  return idx === -1 ? '' : content.slice(idx+1);
+}
+
+function setStatus(msg, isError){
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg;
+  el.className = isError ? 'error' : '';
+  if(msg) setTimeout(()=>{ el.textContent=''; }, 3000);
+}
+
+// 입력창 아래에 필터링된 후보를 보여주는 커스텀 자동완성 드롭다운
+function setupAutocomplete(inputEl, dropdownEl, getOptions){
+  function render(){
+    const filter = inputEl.value.toLowerCase();
+    const opts = getOptions().filter(o => o.toLowerCase().includes(filter));
+    dropdownEl.innerHTML = '';
+    if(opts.length === 0){ dropdownEl.classList.remove('open'); return; }
+    opts.slice(0,8).forEach(o=>{
+      const item = document.createElement('div');
+      item.className = 'ac-item';
+      item.textContent = o;
+      item.addEventListener('mousedown', (e)=>{
+        e.preventDefault();
+        inputEl.value = o;
+        dropdownEl.classList.remove('open');
+      });
+      dropdownEl.appendChild(item);
+    });
+    dropdownEl.classList.add('open');
+  }
+  inputEl.addEventListener('focus', render);
+  inputEl.addEventListener('input', render);
+  inputEl.addEventListener('blur', ()=>{
+    setTimeout(()=> dropdownEl.classList.remove('open'), 120);
+  });
+}
+
+function openModal(){
+  editingId = null;
+  document.getElementById('modalTitle').textContent = '지출 입력';
+  document.getElementById('saveBtn').textContent = '저장하기';
+  document.getElementById('titleInput').value = '';
+  document.getElementById('amountInput').value = '';
+  document.getElementById('memoInput').value = '';
+  document.getElementById('categoryInput').value = DEFAULT_CATEGORY;
+  document.getElementById('recordDate').value = selectedDate;
+  document.getElementById('modalOverlay').classList.add('open');
+  document.getElementById('titleInput').focus();
+}
+function openModalForEdit(record){
+  editingId = record.id;
+  document.getElementById('modalTitle').textContent = '지출 수정';
+  document.getElementById('saveBtn').textContent = '수정하기';
+  document.getElementById('categoryInput').value = record.category || DEFAULT_CATEGORY;
+  document.getElementById('titleInput').value = record.title || '';
+  document.getElementById('amountInput').value = formatComma(String(parseAmount(record.content)));
+  document.getElementById('memoInput').value = parseMemo(record.content);
+  document.getElementById('recordDate').value = record.record_date;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(){
+  editingId = null;
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+async function init(){
+  if(!SUPABASE_URL || SUPABASE_URL === "YOUR_SUPABASE_URL" || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY === "YOUR_SUPABASE_ANON_KEY"){
+    document.getElementById('configWarning').style.display = 'block';
+    return;
+  }
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const today = todayStr();
+  selectedDate = today;
+  viewYear = Number(today.slice(0,4));
+  viewMonth = Number(today.slice(5,7));
+
+  document.getElementById('categoryInput').value = DEFAULT_CATEGORY;
+
+  setupAutocomplete(
+    document.getElementById('categoryInput'),
+    document.getElementById('categoryDropdown'),
+    ()=> categoryOptionsData
+  );
+  setupAutocomplete(
+    document.getElementById('titleInput'),
+    document.getElementById('titleDropdown'),
+    ()=> titleOptionsData
+  );
+
+  await loadOptionLists();
+  await renderCalendar();
+  await refreshList(selectedDate);
+
+  document.getElementById('openModalBtn').addEventListener('click', openModal);
+  document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+  document.getElementById('modalOverlay').addEventListener('click', (e)=>{
+    if(e.target === document.getElementById('modalOverlay')) closeModal();
+  });
+  document.getElementById('prevMonthBtn').addEventListener('click', ()=>{
+    viewMonth--;
+    if(viewMonth < 1){ viewMonth = 12; viewYear--; }
+    renderCalendar();
+  });
+  document.getElementById('nextMonthBtn').addEventListener('click', ()=>{
+    viewMonth++;
+    if(viewMonth > 12){ viewMonth = 1; viewYear++; }
+    renderCalendar();
+  });
+  document.getElementById('amountInput').addEventListener('input', onAmountInput);
+  document.getElementById('entryForm').addEventListener('submit', onSubmit);
+}
+
+// 분류/제목 자동완성 후보를 memories 테이블에 실제 쓰인 값 + 기본값으로 채운다
+async function loadOptionLists(){
+  let cats = [DEFAULT_CATEGORY];
+  let titles = [...DEFAULT_TITLES];
+
+  try{
+    const { data, error } = await sb
+      .from('memories')
+      .select('category, title')
+      .order('created_at', { ascending:false })
+      .limit(200);
+    if(!error && data){
+      data.forEach(r=>{
+        if(r.category && !cats.includes(r.category)) cats.push(r.category);
+        if(r.title && !titles.includes(r.title)) titles.push(r.title);
+      });
+    }
+  }catch(e){ /* 목록 로드 실패해도 기본값으로 진행 */ }
+
+  categoryOptionsData = cats;
+  titleOptionsData = titles;
+}
+
+function currentTitle(){
+  return document.getElementById('titleInput').value.trim();
+}
+function currentCategory(){
+  return document.getElementById('categoryInput').value.trim() || DEFAULT_CATEGORY;
+}
+
+// 선택된 월의 날짜별 지출 합계를 조회한다
+async function loadMonthData(year, month){
+  const start = `${year}-${pad(month)}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const end = `${year}-${pad(month)}-${pad(lastDay)}`;
+
+  const map = {};
+  try{
+    const { data, error } = await sb
+      .from('memories')
+      .select('record_date, content')
+      .gte('record_date', start)
+      .lte('record_date', end);
+    if(!error && data){
+      data.forEach(r=>{
+        const amt = parseAmount(r.content);
+        map[r.record_date] = (map[r.record_date] || 0) + amt;
+      });
+    }
+  }catch(e){ /* 실패 시 빈 달력으로 표시 */ }
+  return map;
+}
+
+async function renderCalendar(){
+  document.getElementById('monthLabel').textContent = `${viewYear}년 ${viewMonth}월`;
+
+  const grid = document.getElementById('calendarGrid');
+  grid.innerHTML = '<div class="empty-msg">불러오는 중...</div>';
+
+  const dayTotals = await loadMonthData(viewYear, viewMonth);
+  const monthSum = Object.values(dayTotals).reduce((a,b)=>a+b, 0);
+  document.getElementById('monthTotal').textContent = `이번 달 합계 ${fmtWon(monthSum)}`;
+
+  const firstWeekday = new Date(viewYear, viewMonth-1, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
+  const todayS = todayStr();
+
+  grid.innerHTML = '';
+  for(let i=0;i<firstWeekday;i++){
+    const blank = document.createElement('div');
+    blank.className = 'cal-cell empty';
+    grid.appendChild(blank);
+  }
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = `${viewYear}-${pad(viewMonth)}-${pad(d)}`;
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell';
+    if(dateStr === todayS) cell.classList.add('today');
+    if(dateStr === selectedDate) cell.classList.add('selected');
+    const amt = dayTotals[dateStr];
+    cell.innerHTML = `<span class="cal-day">${d}</span>` + (amt ? `<span class="cal-amt">${formatComma(String(amt))}</span>` : '');
+    cell.addEventListener('click', ()=>{
+      selectedDate = dateStr;
+      renderCalendar();
+      refreshList(selectedDate);
+    });
+    grid.appendChild(cell);
+  }
+}
+
+async function onSubmit(e){
+  e.preventDefault();
+  const title = currentTitle();
+  const amount = rawAmount();
+  const memo = document.getElementById('memoInput').value;
+  const category = currentCategory();
+  const recordDate = document.getElementById('recordDate').value;
+
+  if(!title){ setStatus('제목을 선택하거나 입력해주세요.', true); return; }
+  if(amount === '' || isNaN(amount)){ setStatus('금액을 입력해주세요.', true); return; }
+  if(!recordDate){ setStatus('날짜를 선택해주세요.', true); return; }
+
+  const row = {
+    category: category,
+    record_date: recordDate,
+    title: title,
+    content: buildContent(amount, memo)
+  };
+
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = editingId ? '수정 중...' : '저장 중...';
+
+  try{
+    const { error } = editingId
+      ? await sb.from('memories').update(row).eq('id', editingId)
+      : await sb.from('memories').insert(row);
+    if(error) throw error;
+    setStatus(editingId ? '수정했습니다.' : '저장했습니다.', false);
+
+    selectedDate = recordDate;
+    if(recordDate.slice(0,4) != String(viewYear) || Number(recordDate.slice(5,7)) != viewMonth){
+      viewYear = Number(recordDate.slice(0,4));
+      viewMonth = Number(recordDate.slice(5,7));
+    }
+
+    editingId = null;
+    await loadOptionLists();
+    closeModal();
+    await renderCalendar();
+    await refreshList(selectedDate);
+  }catch(err){
+    setStatus('저장에 실패했습니다: ' + (err.message || err), true);
+  }finally{
+    saveBtn.disabled = false;
+    saveBtn.textContent = editingId ? '수정하기' : '저장하기';
+  }
+}
+
+async function refreshList(dateStr){
+  document.getElementById('listDayLabel').textContent = `${dateStr} 기록`;
+
+  const listEl = document.getElementById('entryList');
+  listEl.innerHTML = '<div class="empty-msg">불러오는 중...</div>';
+
+  try{
+    const { data, error } = await sb
+      .from('memories')
+      .select('*')
+      .eq('record_date', dateStr)
+      .order('created_at', { ascending:false });
+    if(error) throw error;
+
+    if(!data || data.length === 0){
+      listEl.innerHTML = '<div class="empty-msg">이 날짜에 등록된 지출이 없습니다.</div>';
+      return;
+    }
+
+    listEl.innerHTML = '';
+    data.forEach(r=>{
+      const amt = parseAmount(r.content);
+      const memo = parseMemo(r.content);
+      const row = document.createElement('div');
+      row.className = 'entry-row';
+      row.innerHTML = `
+        <div class="entry-main" data-id="${r.id}" role="button" tabindex="0">
+          <div class="entry-title">${escapeHtml(r.title)}</div>
+          <div class="entry-meta">${escapeHtml(r.category || '')}${memo ? ' · ' + escapeHtml(memo) : ''}</div>
+        </div>
+        <div class="entry-amount">${fmtWon(amt)}</div>
+        <button type="button" class="entry-del" data-id="${r.id}" aria-label="삭제">삭제</button>
+      `;
+      listEl.appendChild(row);
+    });
+
+    listEl.querySelectorAll('.entry-main').forEach(main=>{
+      main.addEventListener('click', ()=>{
+        const record = data.find(r => String(r.id) === main.dataset.id);
+        if(record) openModalForEdit(record);
+      });
+      main.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter' || e.key === ' '){
+          e.preventDefault();
+          main.click();
+        }
+      });
+    });
+
+    listEl.querySelectorAll('.entry-del').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        e.stopPropagation();
+        if(!confirm('이 기록을 삭제할까요?')) return;
+        try{
+          const { error } = await sb.from('memories').delete().eq('id', btn.dataset.id);
+          if(error) throw error;
+          await renderCalendar();
+          await refreshList(dateStr);
+        }catch(err){
+          setStatus('삭제에 실패했습니다: ' + (err.message || err), true);
+        }
+      });
+    });
+  }catch(err){
+    listEl.innerHTML = '<div class="empty-msg">불러오기에 실패했습니다.</div>';
+  }
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+
+init();
+</script>
+</body>
+</html>
